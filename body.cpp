@@ -1,10 +1,7 @@
 #include <iostream>
-#include <string>
-#include <vector>
 #include <math.h>
 #include <stdio.h>
 
-#define N 3 // # of particles
 #define s 1e-5 // softening
 #define G 4.4988e-3 // pc^3 Msun^-1 Myr^-2
 
@@ -16,7 +13,38 @@ typedef struct {
     double acc[3];
 } Particle;
 
-void compute_forces(Particle *p){
+void initialize_particles(Particle* p, int N) {
+
+    srand(time(NULL)); // each run gets different ICs
+
+    for (int i = 0; i < N; ++i){
+        // random mass between 0.5 and 2.0 Msun
+        p[i].mass = 0.5 + (rand() / (double)RAND_MAX) * 1.5;
+        // disk geometry
+        // random angle from 0 to 2pi
+        double angle = 2.0 * M_PI * (rand() / (double)RAND_MAX);
+        // random radius, 
+        // weighted to form higher densities toward centre
+        double radius = 5.0 * sqrt(rand() / (double)RAND_MAX);
+        // particles in flat disk
+        p[i].pos[0] = radius * cos(angle);
+        p[i].pos[1] = radius * sin(angle);
+        p[i].pos[2] = 0.0;
+
+        // circular motion
+        double v = sqrt(G * p[i].mass / (radius + s));
+
+        p[i].vel[0] = -v * sin(angle);
+        p[i].vel[1] =  v * cos(angle);
+        p[i].vel[2] = 0.0;
+
+    }
+
+
+}
+
+void compute_forces(Particle *p, int N){
+
     for (int i = 0; i < N; ++i){
         // zero out acceleration vector for particle i
         p[i].acc[0] = p[i].acc[1] = p[i].acc[2] = 0.0;
@@ -48,19 +76,47 @@ void compute_forces(Particle *p){
 
 int main() {
 
-    // initialize particles
-    Particle p[N] = {
-        {1.0,  {0.0, 0.0, 0.0}, {0.0, 0.0, 0.0}},
-        {2.0,  {1.0, 0.0, 0.0}, {0.0, 0.0, 0.0}},
-        {1.5,  {0.0, 1.0, 0.0}, {0.0, 0.0, 0.0}}
-    };
+    int N = 100;
 
-    compute_forces(p);
+    double t = 0.0;
+    double dt = 0.01;
+    int nsteps = 1000;
 
-    for (int i = 0; i < N; ++i){
-        printf("Particle %d: acc = (%.5e, %.5e, %.5e)\n", 
-            i, p[i].acc[0], p[i].acc[1], p[i].acc[2]);
+    Particle* p = new Particle[N];
+
+    initialize_particles(p, N);
+
+    compute_forces(p, N);
+
+    // leapfrog. kick, drift, re- compute_forces, kick
+
+    for (int step=0; step < nsteps; ++step){
+        for (int i = 0; i < N; ++i){
+            for (int j = 0; j < 3; ++j){
+                p[i].vel[j]+= 0.5 * dt * p[i].acc[j];
+            }
+
+        }
+        for (int i = 0; i < N; ++i){
+            for (int j = 0; j < 3; ++j){
+                p[i].pos[j] += dt * p[i].vel[j];
+            }
+        }
+        compute_forces(p, N);
+        
+        for (int i = 0; i < N; ++i){
+            for (int j = 0; j < 3; ++j){
+                p[i].vel[j]+= 0.5 * dt * p[i].acc[j];
+            }
+        }
     }
 
+    // for (int i = 0; i < N; ++i){
+    //     printf("Particle %d: acc = (%.5e, %.5e, %.5e)\n", 
+    //         i, p[i].acc[0], p[i].acc[1], p[i].acc[2]);
+    // }
+
+
+    delete[] p;
     return 0;
 }
